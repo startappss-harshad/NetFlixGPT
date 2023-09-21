@@ -1,8 +1,75 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Header from "./Header";
+import { checkValidData } from "../utils/Validate";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../utils/firebase";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addUser } from "../utils/userSlice";
 
 const Login = () => {
   const [isSignInForm, setisSignInForm] = useState(true);
+  const [errorMesage, setErrorMesage] = useState(null);
+  const email = useRef(null);
+  const password = useRef(null);
+  const name = useRef(null);
+  const navigate = useNavigate();
+  const dispatch= useDispatch()
+
+  // validate form data//
+  const handleBtnClick = () => {
+    const msg = checkValidData(email.current.value, password.current.value);
+    setErrorMesage(msg);
+    if (msg) return;
+    if (!isSignInForm) {
+      createUserWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          const user = userCredential.user;
+          updateProfile(user, {
+            displayName: name.current.value,
+            photoURL: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHx8MA%3D%3D&w=1000&q=80",
+          })
+            .then(() => {
+              const {uid, email, displayName, photoURL} = auth.currentUser;
+              dispatch(addUser({uid:uid, email:email,displayName:displayName, photoURL:photoURL}));
+              navigate("/browse");
+            })
+            .catch((error) => {
+              setErrorMesage(error.msg);
+            });
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+
+          setErrorMesage(errorCode + "-" + errorMessage);
+          // ..
+        });
+    } else {
+      signInWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          const user = userCredential.user;
+          navigate("/browse");
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMesage(errorCode + "-" + errorMessage);
+        });
+    }
+  };
   const toggleSignInForm = () => {
     setisSignInForm(!isSignInForm);
   };
@@ -15,26 +82,38 @@ const Login = () => {
           alt="loginbgImage"
         />
       </div>
-      <form className="w-4/12 absolute p-12 bg-slate-900 my-36 mx-auto left-0 right-0 text-white rounded-lg bg-opacity-80">
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        className="w-4/12 absolute p-12 bg-slate-900 my-36 mx-auto left-0 right-0 text-white rounded-lg bg-opacity-80"
+      >
         <h1 className="font-bold text-3xl py-4">
           {isSignInForm ? "Sign In" : "Sign Up"}
         </h1>
-        {!isSignInForm&&<input
-          type="Name"
-          placeholder="Enter Your Fullname"
-          className="p-4 my-4 w-full bg-gray-700"
-        />}
+        {!isSignInForm && (
+          <input
+            ref={name}
+            type="Name"
+            placeholder="Enter Your Fullname"
+            className="p-4 my-4 w-full bg-gray-700"
+          />
+        )}
         <input
+          ref={email}
           type="text"
           placeholder="Email"
           className="p-4 my-4 w-full bg-gray-700"
         />
         <input
+          ref={password}
           type="password"
           placeholder="Password"
           className="p-4 my-4 w-full bg-gray-700"
         />
-        <button className="p-4 my-6 bg-red-700 w-full rounded-lg">
+        <p className="text-red-500 font-bold text-lg">{errorMesage}</p>
+        <button
+          className="p-4 my-6 bg-red-700 w-full rounded-lg"
+          onClick={handleBtnClick}
+        >
           {isSignInForm ? "Sign In" : "Sign Up"}
         </button>
         <p className="py-4 cursor-pointer" onClick={toggleSignInForm}>
